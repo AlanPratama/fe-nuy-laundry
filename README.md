@@ -14,7 +14,8 @@ Repositori ini berisi kode antarmuka (frontend) untuk ekosistem **Nuy Laundry**,
   - [02-PRD.md](./docs/02-PRD.md) — Product Requirements Document
   - [03-TSD.md](./docs/03-TSD.md) — Technical Specifications Document
   - [04-DEVELOPER-AND-AI-HANDOVER-GUIDE.md](./docs/04-DEVELOPER-AND-AI-HANDOVER-GUIDE.md) — Developer & AI Handover Guide (Arsitektur, CMS Tiptap, MinIO Image Paste & Map Integration)
-  - [docs/issues/](./docs/issues/README.md) — Backlog Roadmap & Task Issues (#01 s/d #13 Selesai, #14 Backlog)
+  - [docs/issues/](./docs/issues/README.md) — Backlog Roadmap & Task Issues (#01 s/d #14 Selesai)
+- **Backend API**: [AlanPratama/be-nuy-laundry](https://github.com/AlanPratama/be-nuy-laundry)
 
 ---
 
