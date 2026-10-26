@@ -39,6 +39,8 @@ export const ArticlesPage: React.FC = () => {
     totalElements,
     totalPages,
     viewMode,
+    metrics,
+    fetchMetrics,
     fetchArticles,
     deleteArticle,
     togglePublish,
@@ -74,6 +76,7 @@ export const ArticlesPage: React.FC = () => {
     if (urlView === 'table' || urlView === 'card') setViewMode(urlView)
 
     fetchArticles()
+    fetchMetrics()
   }, [])
 
   // Debounced search
@@ -164,8 +167,9 @@ export const ArticlesPage: React.FC = () => {
     }
   }
 
-  const publishedCount = articles.filter((a) => a.isPublished).length
-  const draftCount = articles.filter((a) => !a.isPublished).length
+  const totalCount = metrics?.total ?? (totalElements || articles.length)
+  const publishedCount = metrics?.published ?? articles.filter((a) => a.isPublished).length
+  const draftCount = metrics?.draft ?? articles.filter((a) => !a.isPublished).length
 
   const CATEGORY_TABS = [
     { key: 'ALL', label: 'Semua Kategori' },
@@ -210,7 +214,7 @@ export const ArticlesPage: React.FC = () => {
         <div className="p-5 rounded-3xl bg-white border border-brand-50 shadow-card flex items-center justify-between">
           <div>
             <p className="text-xs text-ink-soft font-bold uppercase tracking-wider">Total Artikel</p>
-            <h3 className="text-2xl font-black text-ink mt-1">{totalElements || articles.length}</h3>
+            <h3 className="text-2xl font-black text-ink mt-1">{totalCount}</h3>
             <p className="text-[11px] text-ink-soft mt-0.5">Konten artikel terdaftar</p>
           </div>
           <div className="w-12 h-12 rounded-2xl bg-brand-50 text-brand-600 grid place-items-center">

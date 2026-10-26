@@ -63,11 +63,50 @@
         </div>
       </div>
 
-      <div class="mt-4 pt-3 flex justify-between items-center text-base font-extrabold">
-        <span class="text-ink">Total Tagihan</span>
-        <span class="text-xl text-brand-600"
-          >Rp{{ result.totalAmount.toLocaleString("id-ID") }}</span
+      <div class="mt-4 pt-4 border-t border-brand-100/70 space-y-2">
+        <div class="flex justify-between items-center text-sm">
+          <span class="text-ink font-bold">Total Tagihan</span>
+          <span class="text-lg font-black text-brand-600">
+            Rp{{ result.totalAmount.toLocaleString("id-ID") }}
+          </span>
+        </div>
+
+        <!-- Payment Status Details -->
+        <div class="flex items-center justify-between text-xs pt-1">
+          <span class="text-ink-soft">Status Pembayaran:</span>
+          <span
+            :class="[
+              'px-2.5 py-1 rounded-full font-bold uppercase tracking-wider text-[10px]',
+              result.paymentStatus === 'PAID'
+                ? 'bg-emerald-100 text-emerald-800'
+                : result.paymentStatus === 'DOWN_PAYMENT'
+                ? 'bg-amber-100 text-amber-900'
+                : 'bg-rose-100 text-rose-800'
+            ]"
+          >
+            {{
+              result.paymentStatus === 'PAID'
+                ? 'Lunas'
+                : result.paymentStatus === 'DOWN_PAYMENT'
+                ? 'DP (Uang Muka)'
+                : 'Belum Bayar'
+            }}
+          </span>
+        </div>
+
+        <div
+          v-if="result.paymentStatus === 'DOWN_PAYMENT' || (result.downPayment && result.downPayment > 0)"
+          class="flex justify-between items-center text-xs text-ink-soft bg-brand-50/50 p-2.5 rounded-xl border border-brand-100/60"
         >
+          <div>
+            <span>DP Terbayar: </span>
+            <strong class="text-ink font-semibold">Rp{{ (result.downPayment || 0).toLocaleString("id-ID") }}</strong>
+          </div>
+          <div>
+            <span>Sisa Pelunasan: </span>
+            <strong class="text-amber-700 font-bold">Rp{{ (result.remainingAmount ?? (result.totalAmount - (result.downPayment || 0))).toLocaleString("id-ID") }}</strong>
+          </div>
+        </div>
       </div>
     </div>
 

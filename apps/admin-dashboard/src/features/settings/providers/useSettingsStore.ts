@@ -31,6 +31,15 @@ interface SettingsStore {
   setRoleFilter: (role: 'ALL' | 'SUPER_ADMIN' | 'ADMIN' | 'STAFF') => void
   setStatusFilter: (status: 'ALL' | 'ACTIVE' | 'INACTIVE') => void
   setSort: (sortBy: 'createdAt' | 'name', direction: 'asc' | 'desc') => void
+  initFilters: (filters: {
+    searchQuery?: string
+    roleFilter?: 'ALL' | 'SUPER_ADMIN' | 'ADMIN' | 'STAFF'
+    statusFilter?: 'ALL' | 'ACTIVE' | 'INACTIVE'
+    sortBy?: 'createdAt' | 'name'
+    direction?: 'asc' | 'desc'
+    currentPage?: number
+    pageSize?: number
+  }) => void
   resetFilters: () => void
 }
 
@@ -184,6 +193,17 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   setRoleFilter: (roleFilter) => set({ roleFilter, currentPage: 1 }),
   setStatusFilter: (statusFilter) => set({ statusFilter, currentPage: 1 }),
   setSort: (sortBy, direction) => set({ sortBy, direction, currentPage: 1 }),
+  initFilters: (filters) => {
+    set({
+      ...(filters.searchQuery !== undefined && { searchQuery: filters.searchQuery }),
+      ...(filters.roleFilter !== undefined && { roleFilter: filters.roleFilter }),
+      ...(filters.statusFilter !== undefined && { statusFilter: filters.statusFilter }),
+      ...(filters.sortBy !== undefined && { sortBy: filters.sortBy }),
+      ...(filters.direction !== undefined && { direction: filters.direction }),
+      ...(filters.currentPage !== undefined && { currentPage: filters.currentPage }),
+      ...(filters.pageSize !== undefined && { pageSize: filters.pageSize })
+    })
+  },
   resetFilters: () => set({
     searchQuery: '',
     roleFilter: 'ALL',

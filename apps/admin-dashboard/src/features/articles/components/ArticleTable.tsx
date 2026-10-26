@@ -75,7 +75,7 @@ export const ArticleTable: React.FC<Props> = ({
   return (
     <div className="bg-white rounded-3xl border border-brand-50 shadow-card overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
+        <table className="w-full text-left border-collapse min-w-[700px]">
           <thead>
             <tr className="border-b border-brand-50 text-[11px] font-bold text-ink-soft uppercase tracking-wider bg-brand-50/30">
               <th className="py-4 px-6">Artikel</th>
@@ -167,7 +167,7 @@ export const ArticleTable: React.FC<Props> = ({
                       <button
                         type="button"
                         onClick={() => onViewDetail(article)}
-                        className="p-2 rounded-xl text-ink-soft hover:text-brand-600 hover:bg-brand-50 transition"
+                        className="w-8 h-8 rounded-full bg-brand-50 text-brand-600 hover:bg-brand-600 hover:text-white grid place-items-center transition shrink-0"
                         title="Lihat Detail Artikel"
                       >
                         <Eye className="w-4 h-4" />
@@ -178,7 +178,7 @@ export const ArticleTable: React.FC<Props> = ({
                           <button
                             type="button"
                             onClick={() => onEdit(article)}
-                            className="p-2 rounded-xl text-ink-soft hover:text-brand-600 hover:bg-brand-50 transition"
+                            className="w-8 h-8 rounded-full bg-amber-50 text-amber-700 hover:bg-amber-600 hover:text-white grid place-items-center transition shrink-0"
                             title="Edit Artikel"
                           >
                             <Edit2 className="w-4 h-4" />
@@ -186,7 +186,7 @@ export const ArticleTable: React.FC<Props> = ({
                           <button
                             type="button"
                             onClick={() => onDelete(article)}
-                            className="p-2 rounded-xl text-ink-soft hover:text-rose-600 hover:bg-rose-50 transition"
+                            className="w-8 h-8 rounded-full bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white grid place-items-center transition shrink-0"
                             title="Hapus Artikel"
                           >
                             <Trash2 className="w-4 h-4" />

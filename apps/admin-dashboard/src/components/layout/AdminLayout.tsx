@@ -39,9 +39,9 @@ export const AdminLayout: React.FC<Props> = ({ children }) => {
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { to: '/transactions', label: 'Transaksi (POS)', icon: Receipt },
     { to: '/packages', label: 'Paket Laundry', icon: Package },
-    { to: '/articles', label: 'Artikel & Tips', icon: BookOpen },
     { to: '/customers', label: 'Pelanggan', icon: Users },
     { to: '/staff', label: 'Staff Kasir', icon: UserCog },
+    { to: '/articles', label: 'Artikel & Tips', icon: BookOpen },
     { to: '/settings', label: 'Pengaturan', icon: Settings, adminOnly: true },
   ]
 

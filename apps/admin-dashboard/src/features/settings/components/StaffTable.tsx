@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import type { StaffUser } from '../models/SettingsModel'
-import { Shield, Search, Filter, RotateCcw, Trash2, Pencil, LayoutGrid, List } from 'lucide-react'
+import { Shield, Search, Filter, RotateCcw, Trash2, Pencil, LayoutGrid, List, Eye } from 'lucide-react'
 import { useSettingsStore } from '../providers/useSettingsStore'
 import { useAuthStore } from '../../auth/providers/useAuthStore'
 import { useToast } from '../../../components/ui/Toast'
@@ -16,9 +16,10 @@ import { resolveImageUrl } from '../../../shared/utils/imageUrl'
 interface Props {
   staffList: StaffUser[]
   onOpenEditModal: (staff: StaffUser) => void
+  onOpenDetailModal?: (staff: StaffUser) => void
 }
 
-export const StaffTable: React.FC<Props> = ({ staffList, onOpenEditModal }) => {
+export const StaffTable: React.FC<Props> = ({ staffList, onOpenEditModal, onOpenDetailModal }) => {
   const { user, token } = useAuthStore()
   const { success, error: toastError } = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -41,6 +42,7 @@ export const StaffTable: React.FC<Props> = ({ staffList, onOpenEditModal }) => {
     setRoleFilter,
     setStatusFilter,
     setSort,
+    initFilters,
     resetFilters
   } = useSettingsStore()
 
@@ -67,20 +69,16 @@ export const StaffTable: React.FC<Props> = ({ staffList, onOpenEditModal }) => {
 
   const canManage = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN'
 
-  // Initialize store from URL params on mount
+  // Initialize store from URL params on mount in a single batch
   useEffect(() => {
-    if (urlQ !== searchQuery) setSearchQuery(urlQ)
-    if (urlRole !== roleFilter) setRoleFilter(urlRole)
-    if (urlStatus !== statusFilter) setStatusFilter(urlStatus)
-    if (urlSortField && urlSortDir && (urlSortField !== sortBy || urlSortDir !== direction)) {
-      setSort(urlSortField, urlSortDir)
-    }
-    if (!isNaN(urlPage) && urlPage >= 1 && urlPage !== currentPage) {
-      setPage(urlPage)
-    }
-    if (!isNaN(urlSize) && urlSize > 0 && urlSize !== pageSize) {
-      setPageSize(urlSize)
-    }
+    initFilters({
+      ...(urlQ && { searchQuery: urlQ }),
+      ...(urlRole !== 'ALL' && { roleFilter: urlRole }),
+      ...(urlStatus !== 'ALL' && { statusFilter: urlStatus }),
+      ...(urlSortField && urlSortDir && { sortBy: urlSortField, direction: urlSortDir }),
+      ...(!isNaN(urlPage) && urlPage >= 1 && { currentPage: urlPage }),
+      ...(!isNaN(urlSize) && urlSize > 0 && { pageSize: urlSize })
+    })
   }, [])
 
   // Sync debounced search with URL params
@@ -343,6 +341,7 @@ export const StaffTable: React.FC<Props> = ({ staffList, onOpenEditModal }) => {
                     onEdit={onOpenEditModal}
                     onDelete={(s) => setStaffToDelete(s)}
                     onToggleStatus={handleToggleStatus}
+                    onViewDetail={onOpenDetailModal}
                   />
                 )
               })}
@@ -366,7 +365,7 @@ export const StaffTable: React.FC<Props> = ({ staffList, onOpenEditModal }) => {
       ) : (
         <div className="rounded-3xl bg-white border border-brand-50 shadow-card overflow-hidden">
           <div className="overflow-x-auto w-full">
-            <table className="w-full text-left text-sm min-w-[650px]">
+            <table className="w-full text-left text-sm min-w-[700px]">
               <thead className="bg-brand-50/60 text-ink font-bold uppercase tracking-wider text-xs border-b border-brand-50">
                 <tr>
                   <th className="py-4 px-6 w-60">Nama Pengguna</th>
@@ -467,11 +466,20 @@ export const StaffTable: React.FC<Props> = ({ staffList, onOpenEditModal }) => {
                               {new Date(u.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
                             </span>
 
+                            <button
+                              type="button"
+                              onClick={() => onOpenDetailModal?.(u)}
+                              className="w-8 h-8 rounded-full bg-brand-50 text-brand-600 hover:bg-brand-600 hover:text-white grid place-items-center transition shrink-0 ml-1"
+                              title="Lihat detail & riwayat transaksi staff"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+
                             {canManage && canEdit && (
                               <button
                                 type="button"
                                 onClick={() => onOpenEditModal(u)}
-                                className="w-8 h-8 rounded-full bg-brand-50 text-brand-600 hover:bg-brand-600 hover:text-white grid place-items-center transition shrink-0 ml-1"
+                                className="w-8 h-8 rounded-full bg-amber-50 text-amber-700 hover:bg-amber-600 hover:text-white grid place-items-center transition shrink-0 ml-1"
                                 title="Edit akun staff"
                               >
                                 <Pencil className="w-3.5 h-3.5" />

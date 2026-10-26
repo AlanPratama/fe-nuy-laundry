@@ -39,6 +39,7 @@ export const PackagesPage: React.FC = () => {
     setStatusFilter,
     setSearchQuery,
     setSort,
+    initFilters,
     resetFilters
   } = usePackageStore()
 
@@ -74,12 +75,15 @@ export const PackagesPage: React.FC = () => {
 
   const canManage = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN'
 
-  // Initialize store from URL on first mount
+  // Initialize store from URL on first mount in a single batch
   useEffect(() => {
-    if (urlQ !== searchQuery) setSearchQuery(urlQ)
-    if (urlType !== activeFilter) setActiveFilter(urlType)
-    if (urlStatus !== statusFilter) setStatusFilter(urlStatus)
-    if (urlSortField !== sortBy || urlSortDir !== direction) setSort(urlSortField, urlSortDir)
+    initFilters({
+      searchQuery: urlQ,
+      activeFilter: urlType,
+      statusFilter: urlStatus,
+      sortBy: urlSortField,
+      direction: urlSortDir
+    })
   }, [])
 
   // Helper to update URL params
@@ -596,11 +600,10 @@ export const PackagesPage: React.FC = () => {
                                   setSelectedDetailPackage(pkg)
                                   setIsDetailModalOpen(true)
                                 }}
-                                className="px-2.5 py-1.5 rounded-xl bg-brand-50 text-brand-600 hover:bg-brand-600 hover:text-white transition text-xs font-bold inline-flex items-center gap-1 shadow-xs"
+                                className="w-8 h-8 rounded-full bg-brand-50 text-brand-600 hover:bg-brand-600 hover:text-white grid place-items-center transition shrink-0"
                                 title="Lihat Detail & Riwayat Transaksi"
                               >
-                                <Eye className="w-3.5 h-3.5" />
-                                <span>Detail</span>
+                                <Eye className="w-4 h-4" />
                               </button>
 
                               {canManage && (
@@ -608,18 +611,18 @@ export const PackagesPage: React.FC = () => {
                                   <button
                                     type="button"
                                     onClick={() => handleOpenEdit(pkg)}
-                                    className="w-7 h-7 rounded-full bg-brand-50 text-brand-600 hover:bg-brand-600 hover:text-white grid place-items-center transition"
+                                    className="w-8 h-8 rounded-full bg-amber-50 text-amber-700 hover:bg-amber-600 hover:text-white grid place-items-center transition shrink-0"
                                     title="Edit Paket"
                                   >
-                                    <Pencil className="w-3.5 h-3.5" />
+                                    <Pencil className="w-4 h-4" />
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => setPackageToDelete(pkg)}
-                                    className="w-7 h-7 rounded-full bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white grid place-items-center transition"
+                                    className="w-8 h-8 rounded-full bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white grid place-items-center transition shrink-0"
                                     title="Hapus Paket"
                                   >
-                                    <Trash2 className="w-3.5 h-3.5" />
+                                    <Trash2 className="w-4 h-4" />
                                   </button>
                                 </>
                               )}

@@ -1,4 +1,4 @@
-import type { TrackingResult, TrackingStep } from '../models/TrackingModel'
+import type { TrackingResult, TrackingStep, TrackingItem } from '../models/TrackingModel'
 import type { ApiResponse } from '@nuy-laundry/shared-types'
 
 export interface ITrackingRepository {
@@ -64,12 +64,6 @@ export class TrackingRepository implements ITrackingRepository {
       // Backend offline or unreachable
     }
 
-    // Fallback to mock data for local demo or tests
-    const mock = this.getMockResult(trimmed)
-    if (mock) {
-      return mock
-    }
-
     throw new Error(`Data transaksi dengan nomor "${trimmed}" tidak ditemukan. Silakan periksa kembali atau hubungi WhatsApp admin kami.`)
   }
 
@@ -81,11 +75,15 @@ export class TrackingRepository implements ITrackingRepository {
     const totalAmount = typeof dto.totalAmount === 'number' 
       ? dto.totalAmount 
       : Number(dto.totalPrice || 0)
+    const downPayment = Number(dto.downPayment || 0)
+    const remainingAmount = Math.max(0, totalAmount - downPayment)
+    const paymentStatus = dto.paymentStatus || (dto.isPaid ? 'PAID' : (downPayment > 0 ? 'DOWN_PAYMENT' : 'UNPAID'))
+
     const createdAt = dto.createdAt || dto.orderDate || new Date().toISOString()
     const customerName = dto.customerName || dto.customer?.name || 'Pelanggan Nuy'
 
     // Map items from transactionDetails or items
-    let items = []
+    let items: TrackingItem[] = []
     if (Array.isArray(dto.items) && dto.items.length > 0) {
       items = dto.items.map((item: any) => ({
         packageName: item.packageName || 'Layanan Laundry',
@@ -99,45 +97,48 @@ export class TrackingRepository implements ITrackingRepository {
         const qty = det.quantity || 1
         const price = det.pkg?.price || (qty ? Math.round(Number(det.totalPrice || 0) / qty) : 0)
         return {
-          packageName: det.packageName || det.pkg?.name || 'Layanan Laundry',
-          packageType: det.packageType || det.pkg?.type || 'WEIGHT',
+          packageName: det.pkg?.name || det.packageName || 'Layanan Laundry',
+          packageType: det.pkg?.type || det.packageType || 'WEIGHT',
           quantity: qty,
           pricePerUnit: price,
-          subtotal: Number(det.totalPrice || 0)
+          subtotal: Number(det.totalPrice || (qty * price))
         }
       })
-    } else {
+    } else if (dto.packageName) {
       items = [
         {
-          packageName: 'Layanan Laundry',
-          packageType: 'WEIGHT' as const,
-          quantity: 1,
-          pricePerUnit: totalAmount,
+          packageName: dto.packageName,
+          packageType: dto.packageType || 'WEIGHT',
+          quantity: dto.quantity || 1,
+          pricePerUnit: dto.pricePerUnit || totalAmount,
           subtotal: totalAmount
         }
       ]
     }
 
-    // Map photo documentation
-    const conditionBeforeUrls: string[] = [...(dto.conditionBeforeUrls || [])]
-    const conditionAfterUrls: string[] = [...(dto.conditionAfterUrls || [])]
+    // Map photos from transactionFiles or direct URL arrays
+    let conditionBeforeUrls: string[] = []
+    let conditionAfterUrls: string[] = []
 
-    if (Array.isArray(dto.transactionFiles)) {
-      for (const f of dto.transactionFiles) {
-        const url = f.filePath || f.fileName
-        if (url) {
-          if (f.fileType === 'CONDITION_BEFORE' && !conditionBeforeUrls.includes(url)) {
-            conditionBeforeUrls.push(url)
-          } else if (f.fileType === 'CONDITION_AFTER' && !conditionAfterUrls.includes(url)) {
-            conditionAfterUrls.push(url)
-          }
-        }
+    if (Array.isArray(dto.transactionFiles) && dto.transactionFiles.length > 0) {
+      conditionBeforeUrls = dto.transactionFiles
+        .filter((f: any) => f.type === 'BEFORE' && f.fileUrl)
+        .map((f: any) => f.fileUrl)
+      conditionAfterUrls = dto.transactionFiles
+        .filter((f: any) => f.type === 'AFTER' && f.fileUrl)
+        .map((f: any) => f.fileUrl)
+    } else {
+      if (Array.isArray(dto.conditionBeforeUrls)) {
+        conditionBeforeUrls = dto.conditionBeforeUrls
+      }
+      if (Array.isArray(dto.conditionAfterUrls)) {
+        conditionAfterUrls = dto.conditionAfterUrls
       }
     }
 
     const createdTimeStr = createdAt 
       ? new Date(createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB'
-      : '09:00 WIB'
+      : undefined
 
     const updatedTimeStr = dto.updatedAt || dto.deliveredDate
       ? new Date(dto.updatedAt || dto.deliveredDate).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB'
@@ -156,7 +157,7 @@ export class TrackingRepository implements ITrackingRepository {
         id: '2',
         title: 'Proses Pencucian dan Pengemasan',
         description: 'Pakaian dicuci 1 mesin 1 pelanggan, disetrika uap temperatur tepat, dan dikemas rapi.',
-        time: isDone ? '11:30 WIB' : (dto.status === 'IN_PROGRESS' ? 'Sedang berlangsung' : undefined),
+        time: undefined, // Jam/menit dihapus sesuai request
         isCompleted: isDone || dto.status === 'IN_PROGRESS',
         isCurrent: !isDone && dto.status === 'IN_PROGRESS'
       },
@@ -176,6 +177,9 @@ export class TrackingRepository implements ITrackingRepository {
       customerNameMasked: this.maskName(customerName),
       status: dto.status || 'IN_PROGRESS',
       statusLabel: isDone ? 'Selesai & Siap Diantar' : isCanceled ? 'Dibatalkan' : 'Sedang Diproses',
+      paymentStatus,
+      downPayment,
+      remainingAmount,
       totalAmount,
       createdAt,
       completedAt: isDone ? (dto.updatedAt || dto.deliveredDate) : undefined,
@@ -189,113 +193,5 @@ export class TrackingRepository implements ITrackingRepository {
   private maskName(name: string): string {
     const parts = name.split(' ')
     return parts.map(p => (p.length > 2 ? p[0] + '*'.repeat(p.length - 2) + p[p.length - 1] : p[0] + '*')).join(' ')
-  }
-
-  private getMockResult(query: string): TrackingResult | null {
-    const q = query.toUpperCase()
-
-    if (q.includes('DONE') || q.includes('002') || q.includes('SELESAI')) {
-      return {
-        id: 'TRX-98231',
-        invoiceNumber: 'INV-20261025-002',
-        customerNameMasked: 'Di*** Pr*****',
-        status: 'DONE',
-        statusLabel: 'Selesai & Siap Diantar',
-        totalAmount: 48000,
-        createdAt: '2026-10-24T09:15:00.000Z',
-        completedAt: '2026-10-24T17:45:00.000Z',
-        items: [
-          {
-            packageName: 'Cuci Setrika Reguler',
-            packageType: 'WEIGHT',
-            quantity: 6,
-            pricePerUnit: 8000,
-            subtotal: 48000
-          }
-        ],
-        conditionBeforeUrls: [
-          'https://images.unsplash.com/photo-1582735689369-4fe89db7114c?w=600&auto=format&fit=crop&q=80'
-        ],
-        conditionAfterUrls: [
-          'https://images.unsplash.com/photo-1545173168-9f1947eebb7f?w=600&auto=format&fit=crop&q=80'
-        ],
-        steps: [
-          {
-            id: '1',
-            title: 'Pesanan Diterima',
-            description: 'Pakaian 6 kg diterima kasir dan ditimbang di outlet.',
-            time: '09:15 WIB',
-            isCompleted: true,
-            isCurrent: false
-          },
-          {
-            id: '2',
-            title: 'Proses Pencucian dan Pengemasan',
-            description: 'Dicuci terpisah 1 mesin 1 pelanggan, disetrika uap licin, dan dikemas rapi.',
-            time: '11:00 WIB',
-            isCompleted: true,
-            isCurrent: false
-          },
-          {
-            id: '3',
-            title: 'Selesai',
-            description: 'Paket wangi rapi siap diambil atau diantarkan ke alamat tujuan.',
-            time: '17:45 WIB',
-            isCompleted: true,
-            isCurrent: true
-          }
-        ]
-      }
-    }
-
-    // Default mock (In Progress) for any other code
-    return {
-      id: 'TRX-10294',
-      invoiceNumber: query.startsWith('INV') ? query : `INV-${query}`,
-      customerNameMasked: 'Al** Pr*****',
-      status: 'IN_PROGRESS',
-      statusLabel: 'Sedang Diproses (Cuci & Setrika)',
-      totalAmount: 32000,
-      createdAt: new Date().toISOString(),
-      estimatedDoneAt: 'Hari ini, pukul 18:00 WIB',
-      items: [
-        {
-          packageName: 'Cuci Setrika Reguler (Wangi Sakura)',
-          packageType: 'WEIGHT',
-          quantity: 4,
-          pricePerUnit: 8000,
-          subtotal: 32000
-        }
-      ],
-      conditionBeforeUrls: [
-        'https://images.unsplash.com/photo-1517677208171-0bc6725a3e60?w=600&auto=format&fit=crop&q=80'
-      ],
-      conditionAfterUrls: [],
-      steps: [
-        {
-          id: '1',
-          title: 'Pesanan Diterima',
-          description: 'Pakaian 4 kg diterima kasir dan ditimbang di outlet.',
-          time: '08:30 WIB',
-          isCompleted: true,
-          isCurrent: false
-        },
-        {
-          id: '2',
-          title: 'Proses Pencucian dan Pengemasan',
-          description: 'Cucian sedang diproses di tabung mesin 1:1 higienis dan disetrika uap.',
-          time: '10:15 WIB',
-          isCompleted: true,
-          isCurrent: true
-        },
-        {
-          id: '3',
-          title: 'Selesai',
-          description: 'Menunggu proses selesai dan siap diantar/diambil pelanggan.',
-          isCompleted: false,
-          isCurrent: false
-        }
-      ]
-    }
   }
 }

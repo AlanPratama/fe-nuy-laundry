@@ -71,9 +71,16 @@ export const TransactionCard: React.FC<Props> = ({
               <p className="font-semibold text-ink truncate">
                 {firstItem?.packageName || 'Layanan Laundry'}
               </p>
-              <p className="text-[11px] text-ink-soft">
-                {firstItem?.quantity || 1} {firstItem?.packageType === 'PCS' ? 'pcs' : 'kg'}
-              </p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <p className="text-[11px] text-ink-soft">
+                  {firstItem?.quantity || 1} {firstItem?.packageType === 'PCS' ? 'pcs' : 'kg'}
+                </p>
+                {transaction.items && transaction.items.length > 1 && (
+                  <span className="text-[10px] bg-brand-100 text-brand-700 px-1.5 py-0.5 rounded-full font-bold">
+                    +{transaction.items.length - 1} layanan lainnya
+                  </span>
+                )}
+              </div>
             </div>
             <div className="text-right shrink-0">
               <p className="font-extrabold text-sm text-brand-600">
@@ -157,10 +164,10 @@ export const TransactionCard: React.FC<Props> = ({
           <button
             type="button"
             onClick={() => onDelete(transaction)}
-            className="w-7 h-7 rounded-full bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white grid place-items-center transition"
+            className="w-8 h-8 rounded-full bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white grid place-items-center transition shrink-0"
             title="Hapus transaksi"
           >
-            <Trash2 className="w-3.5 h-3.5" />
+            <Trash2 className="w-4 h-4" />
           </button>
         )}
       </div>

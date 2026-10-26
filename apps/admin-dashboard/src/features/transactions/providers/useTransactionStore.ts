@@ -21,6 +21,11 @@ interface TransactionStore {
   totalPages: number
   fetchTransactions: (token?: string) => Promise<void>
   fetchMetrics: (token?: string) => Promise<void>
+  getTransactionById: (token: string | undefined, id: string) => Promise<TransactionResponseDTO>
+  getTransactionsByCustomer: (token: string | undefined, customerId: string) => Promise<TransactionResponseDTO[]>
+  getTransactionsByUser: (token: string | undefined, userId: string) => Promise<TransactionResponseDTO[]>
+  markDetailDelivered: (token: string | undefined, detailId: string) => Promise<void>
+  deleteTransactionFiles: (token: string | undefined, fileIds: string[]) => Promise<void>
   createTransaction: (token: string | undefined, payload: CreateTransactionPayload) => Promise<void>
   updateTransactionStatus: (token: string | undefined, id: string, status: TransactionStatus) => Promise<void>
   updateTransactionPayment: (
@@ -35,7 +40,8 @@ interface TransactionStore {
     id: string,
     beforeUrls: string[],
     afterUrls: string[],
-    newFiles?: { conditionBeforeFiles?: File[]; conditionAfterFiles?: File[] }
+    newFiles?: { conditionBeforeFiles?: File[]; conditionAfterFiles?: File[] },
+    deletedFileIds?: string[]
   ) => Promise<void>
   setPage: (page: number) => void
   setPageSize: (size: number) => void
@@ -46,6 +52,7 @@ interface TransactionStore {
   setPicFilter: (picId: string) => void
   setCustomerFilter: (customerId: string) => void
   setPackageFilter: (packageId: string) => void
+  initFilters: (filters: Partial<Pick<TransactionStore, 'searchQuery' | 'filterStatus' | 'sortBy' | 'direction' | 'period' | 'picFilter' | 'customerFilter' | 'packageFilter' | 'currentPage' | 'pageSize'>>) => void
   resetFilters: () => void
 }
 
@@ -160,14 +167,50 @@ export const useTransactionStore = create<TransactionStore>((set, get) => ({
     }
   },
 
+  getTransactionById: async (token: string | undefined, id: string) => {
+    return await trxRepo.getById(id, token)
+  },
+
+  getTransactionsByCustomer: async (token: string | undefined, customerId: string) => {
+    const result = await trxRepo.getAll(token, {
+      customerId,
+      size: 100,
+      page: 0
+    })
+    return result.transactions
+  },
+
+  getTransactionsByUser: async (token: string | undefined, userId: string) => {
+    const result = await trxRepo.getAll(token, {
+      userId,
+      size: 100,
+      page: 0
+    })
+    return result.transactions
+  },
+
+  markDetailDelivered: async (token: string | undefined, detailId: string) => {
+    await trxRepo.markDetailDelivered(detailId)
+    await get().fetchTransactions(token)
+  },
+
+  deleteTransactionFiles: async (_token: string | undefined, fileIds: string[]) => {
+    await trxRepo.deleteTransactionFiles(fileIds)
+  },
+
   saveTransactionPhotos: async (
     token: string | undefined,
     id: string,
     beforeUrls: string[],
     afterUrls: string[],
-    newFiles?: { conditionBeforeFiles?: File[]; conditionAfterFiles?: File[] }
+    newFiles?: { conditionBeforeFiles?: File[]; conditionAfterFiles?: File[] },
+    deletedFileIds?: string[]
   ) => {
     try {
+      if (deletedFileIds && deletedFileIds.length > 0) {
+        await trxRepo.deleteTransactionFiles(deletedFileIds)
+      }
+
       if (
         newFiles &&
         ((newFiles.conditionBeforeFiles && newFiles.conditionBeforeFiles.length > 0) ||
@@ -205,6 +248,7 @@ export const useTransactionStore = create<TransactionStore>((set, get) => ({
   setPicFilter: (picFilter) => set({ picFilter, currentPage: 1 }),
   setCustomerFilter: (customerFilter) => set({ customerFilter, currentPage: 1 }),
   setPackageFilter: (packageFilter) => set({ packageFilter, currentPage: 1 }),
+  initFilters: (filters) => set((state) => ({ ...state, ...filters })),
   resetFilters: () => set({
     searchQuery: '',
     filterStatus: 'ALL',

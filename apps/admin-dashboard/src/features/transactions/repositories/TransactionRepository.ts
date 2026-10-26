@@ -15,6 +15,8 @@ export interface ITransactionRepository {
   updatePayment(token?: string, id?: string, downPayment?: number, paymentStatus?: import('../models/TransactionModel').PaymentStatus): Promise<TransactionResponseDTO>
   delete(token?: string, id?: string): Promise<void>
   uploadFiles(token?: string, transactionId?: string, files?: { conditionBeforeFiles?: File[]; conditionAfterFiles?: File[] }): Promise<void>
+  deleteTransactionFiles(fileIds: string[]): Promise<void>
+  markDetailDelivered(detailId: string): Promise<any>
   getMetrics(token?: string): Promise<import('../models/TransactionModel').TransactionMetrics>
 }
 
@@ -287,6 +289,18 @@ export class TransactionRepository implements ITransactionRepository {
     await apiClient.post('/api/v1/transaction-files', formData)
   }
 
+  async markDetailDelivered(detailId: string): Promise<any> {
+    const res = await apiClient.patch<ApiResponse<any>>(`/api/v1/transaction-details/${detailId}/delivered`)
+    return res.data?.data
+  }
+
+  async deleteTransactionFiles(fileIds: string[]): Promise<void> {
+    if (!fileIds || fileIds.length === 0) return
+    await apiClient.delete('/api/v1/transaction-files/list', {
+      data: { transactionFileIds: fileIds }
+    })
+  }
+
   private normalizeTransaction(raw: any): TransactionResponseDTO {
     const invoiceNumber = raw.invoiceNumber || raw.invoiceNo || raw.id || 'INV-UNKNOWN'
     const totalAmount = typeof raw.totalAmount === 'number' 
@@ -309,7 +323,9 @@ export class TransactionRepository implements ITransactionRepository {
           packageType: det.packageType || pkg.type || 'WEIGHT',
           pricePerUnit: price,
           quantity: qty,
-          subtotal: Number(det.totalPrice || price * qty)
+          subtotal: Number(det.totalPrice || price * qty),
+          targetDate: det.targetDate,
+          deliveredDate: det.deliveredDate
         }
       })
     } else {
@@ -321,7 +337,8 @@ export class TransactionRepository implements ITransactionRepository {
           packageType: 'WEIGHT',
           pricePerUnit: totalAmount,
           quantity: 1,
-          subtotal: totalAmount
+          subtotal: totalAmount,
+          deliveredDate: null
         }
       ]
     }
@@ -373,6 +390,7 @@ export class TransactionRepository implements ITransactionRepository {
       conditionBeforeUrls: beforeUrls,
       conditionAfterUrls: afterUrls,
       otherUrls,
+      transactionFiles: Array.isArray(raw.transactionFiles) ? raw.transactionFiles : undefined,
       createdAt
     }
   }

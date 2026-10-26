@@ -74,6 +74,7 @@ export const TransactionsPage: React.FC = () => {
     setPageSize,
     setSort,
     setPeriod,
+    initFilters,
     resetFilters
   } = useTransactionStore()
 
@@ -117,17 +118,20 @@ export const TransactionsPage: React.FC = () => {
 
   const canManage = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN'
 
-  // Initialize store from URL on first mount
+  // Initialize store from URL on first mount in a single batch
   useEffect(() => {
-    if (urlQ !== searchQuery) setSearchQuery(urlQ)
-    if (urlStatus !== filterStatus) setFilterStatus(urlStatus)
-    if (urlPeriod !== period) setPeriod(urlPeriod)
-    if (urlPic !== picFilter) setPicFilter(urlPic)
-    if (urlCust !== customerFilter) setCustomerFilter(urlCust)
-    if (urlPkg !== packageFilter) setPackageFilter(urlPkg)
-    if (urlSortField !== sortBy || urlSortDir !== direction) setSort(urlSortField, urlSortDir)
-    if (urlPage !== currentPage) setPage(urlPage)
-    if (urlSize !== pageSize) setPageSize(urlSize)
+    initFilters({
+      searchQuery: urlQ,
+      filterStatus: urlStatus,
+      period: urlPeriod,
+      picFilter: urlPic,
+      customerFilter: urlCust,
+      packageFilter: urlPkg,
+      sortBy: urlSortField,
+      direction: urlSortDir,
+      currentPage: urlPage,
+      pageSize: urlSize
+    })
   }, [])
 
   // Sync debounced search to URL params and store
@@ -644,20 +648,20 @@ export const TransactionsPage: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => handleRowClick(trx)}
-                            className="px-3 py-1.5 rounded-full bg-brand-50 text-brand-600 text-xs font-bold hover:bg-brand-100 transition inline-flex items-center gap-1 shadow-xs"
+                            className="w-8 h-8 rounded-full bg-brand-50 text-brand-600 hover:bg-brand-600 hover:text-white grid place-items-center transition shrink-0"
+                            title="Lihat Detail Transaksi"
                           >
-                            <Eye className="w-3.5 h-3.5" />
-                            <span>Detail</span>
+                            <Eye className="w-4 h-4" />
                           </button>
 
                           {canManage && (
                             <button
                               type="button"
                               onClick={() => setTransactionToDelete(trx)}
-                              className="w-7 h-7 rounded-full bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white grid place-items-center transition shrink-0"
+                              className="w-8 h-8 rounded-full bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white grid place-items-center transition shrink-0"
                               title="Hapus transaksi"
                             >
-                              <Trash2 className="w-3 h-3" />
+                              <Trash2 className="w-4 h-4" />
                             </button>
                           )}
                         </div>
@@ -825,8 +829,8 @@ export const TransactionsPage: React.FC = () => {
             setSelectedTransaction(updated)
           }
         }}
-        onSavePhotos={async (id, beforeUrls, afterUrls, newFiles) => {
-          await saveTransactionPhotos(token || undefined, id, beforeUrls, afterUrls, newFiles)
+        onSavePhotos={async (id, beforeUrls, afterUrls, newFiles, deletedFileIds) => {
+          await saveTransactionPhotos(token || undefined, id, beforeUrls, afterUrls, newFiles, deletedFileIds)
           if (selectedTransaction && selectedTransaction.id === id) {
             setSelectedTransaction({ ...selectedTransaction, conditionBeforeUrls: beforeUrls, conditionAfterUrls: afterUrls })
           }

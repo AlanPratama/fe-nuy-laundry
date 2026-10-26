@@ -1,4 +1,4 @@
-import type { TransactionStatus, PackageType } from '@nuy-laundry/shared-types'
+import type { TransactionStatus, PackageType, PaymentStatus } from '@nuy-laundry/shared-types'
 
 export interface TrackingStep {
   id: string
@@ -23,6 +23,9 @@ export interface TrackingResult {
   customerNameMasked: string
   status: TransactionStatus
   statusLabel: string
+  paymentStatus?: PaymentStatus | string
+  downPayment?: number
+  remainingAmount?: number
   totalAmount: number
   createdAt: string
   estimatedDoneAt?: string

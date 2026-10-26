@@ -53,7 +53,7 @@
 
         <!-- Article Prose Body -->
         <div 
-          class="prose prose-lg max-w-none text-ink-soft leading-relaxed space-y-4 [&>h3]:text-ink [&>h3]:text-2xl [&>h3]:font-bold [&>h3]:mt-8 [&>h3]:mb-3 [&>p]:text-base [&>p]:leading-relaxed [&>ul]:list-disc [&>ul]:pl-5 [&>ul]:space-y-2 [&>strong]:text-ink"
+          class="medium-rendered-content max-w-none text-ink-soft leading-relaxed"
           v-html="currentArticle.content"
         ></div>
 

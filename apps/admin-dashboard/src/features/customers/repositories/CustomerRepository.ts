@@ -54,15 +54,17 @@ export class CustomerRepository implements ICustomerRepository {
 
         const customers: CustomerItem[] = rawContent.map((c: any) => {
           const transactions = Array.isArray(c.transactions) ? c.transactions : []
-          const totalOrders = transactions.length
-          const totalSpent = transactions.reduce((acc: number, t: any) => acc + Number(t.totalPrice || 0), 0)
+          const totalOrders = c.totalTransaksi ?? transactions.length
+          const totalSpent = transactions.length > 0
+            ? transactions.reduce((acc: number, t: any) => acc + Number(t.totalPrice || 0), 0)
+            : Number(c.totalSpent || 0)
 
-          let totalWeightKg = 0
+          let calculatedWeight = 0
           const history = transactions.map((t: any) => {
             const firstDetail = t.transactionDetails?.[0]
             const qty = firstDetail?.quantity || 1
             if (firstDetail?.packageType === 'WEIGHT') {
-              totalWeightKg += qty
+              calculatedWeight += qty
             }
             return {
               id: t.id,
@@ -76,7 +78,11 @@ export class CustomerRepository implements ICustomerRepository {
             }
           })
 
-          const lastOrderDate = transactions[0]?.orderDate || c.updatedAt || c.createdAt || new Date().toISOString()
+          const totalWeightKg = c.totalCucianKg !== undefined && c.totalCucianKg !== null
+            ? Number(c.totalCucianKg)
+            : calculatedWeight
+
+          const lastOrderDate = c.lastOrder || transactions[0]?.orderDate || c.updatedAt || c.createdAt || new Date().toISOString()
 
           return {
             id: c.id,

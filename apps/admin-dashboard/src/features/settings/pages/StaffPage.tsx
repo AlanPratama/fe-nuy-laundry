@@ -2,11 +2,17 @@ import React, { useEffect, useState } from 'react'
 import { useSettingsStore } from '../providers/useSettingsStore'
 import { useAuthStore } from '../../auth/providers/useAuthStore'
 import { StaffTable } from '../components/StaffTable'
+import { StaffDetailModal } from '../components/StaffDetailModal'
 import { AddStaffModal } from '../components/AddStaffModal'
 import { EditStaffModal } from '../components/EditStaffModal'
+import { TransactionDetailModal } from '../../transactions/components/TransactionDetailModal'
+import { TransactionRepository } from '../../transactions/repositories/TransactionRepository'
 import type { CreateStaffPayload, UpdateStaffPayload, StaffUser } from '../models/SettingsModel'
+import type { TransactionResponseDTO } from '@nuy-laundry/shared-types'
 import { useToast } from '../../../components/ui/Toast'
 import { UserPlus, Users, UserCheck, Shield } from 'lucide-react'
+
+const trxRepo = new TransactionRepository()
 
 export const StaffPage: React.FC = () => {
   const { user, token } = useAuthStore()
@@ -31,6 +37,10 @@ export const StaffPage: React.FC = () => {
   const [isAddStaffOpen, setIsAddStaffOpen] = useState(false)
   const [isEditStaffOpen, setIsEditStaffOpen] = useState(false)
   const [editingStaff, setEditingStaff] = useState<StaffUser | null>(null)
+  const [selectedStaffForDetail, setSelectedStaffForDetail] = useState<StaffUser | null>(null)
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
+  const [selectedTransaction, setSelectedTransaction] = useState<TransactionResponseDTO | null>(null)
+  const [isTrxDetailOpen, setIsTrxDetailOpen] = useState(false)
 
   const canManage = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN'
 
@@ -70,6 +80,16 @@ export const StaffPage: React.FC = () => {
   const totalStaffCount = staffMetrics?.totalStaff ?? (totalElements || staffList.length)
   const activeStaffCount = staffMetrics?.activeStaff ?? staffList.filter((s) => s.isActive).length
   const adminStaffCount = staffMetrics?.adminCount ?? staffList.filter((s) => s.role === 'ADMIN' || s.role === 'SUPER_ADMIN').length
+
+  const handleSelectTransaction = async (transactionId: string) => {
+    try {
+      const trx = await trxRepo.getById(transactionId, token || undefined)
+      setSelectedTransaction(trx)
+      setIsTrxDetailOpen(true)
+    } catch (err: any) {
+      toastError(err?.message || 'Gagal memuat detail transaksi')
+    }
+  }
 
   return (
     <div className="space-y-8">
@@ -142,7 +162,32 @@ export const StaffPage: React.FC = () => {
           setEditingStaff(staff)
           setIsEditStaffOpen(true)
         }}
+        onOpenDetailModal={(staff) => {
+          setSelectedStaffForDetail(staff)
+          setIsDetailModalOpen(true)
+        }}
       />
+
+      <StaffDetailModal
+        isOpen={isDetailModalOpen}
+        onClose={() => {
+          setIsDetailModalOpen(false)
+          setSelectedStaffForDetail(null)
+        }}
+        staff={selectedStaffForDetail}
+        onSelectTransaction={handleSelectTransaction}
+      />
+
+      {selectedTransaction && (
+        <TransactionDetailModal
+          isOpen={isTrxDetailOpen}
+          onClose={() => {
+            setIsTrxDetailOpen(false)
+            setSelectedTransaction(null)
+          }}
+          transaction={selectedTransaction}
+        />
+      )}
 
       <AddStaffModal
         isOpen={isAddStaffOpen}

@@ -2,7 +2,8 @@ import { create } from 'zustand'
 import type { 
   ArticleItem, 
   CreateArticlePayload, 
-  UpdateArticlePayload 
+  UpdateArticlePayload,
+  ArticleMetrics
 } from '../models/ArticleModel'
 import { ArticleRepository } from '../repositories/ArticleRepository'
 
@@ -22,6 +23,9 @@ interface ArticleStore {
   totalElements: number
   totalPages: number
   viewMode: 'table' | 'card'
+  // Metrics
+  metrics: ArticleMetrics | null
+  fetchMetrics: () => Promise<void>
 
   // Actions
   fetchArticles: () => Promise<void>
@@ -58,6 +62,16 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
   totalElements: 0,
   totalPages: 1,
   viewMode: 'card',
+  metrics: null,
+
+  fetchMetrics: async () => {
+    try {
+      const metrics = await articleRepo.getMetrics()
+      set({ metrics })
+    } catch (err) {
+      console.error('Failed to load article metrics in store:', err)
+    }
+  },
 
   fetchArticles: async () => {
     const { searchQuery, categoryFilter, statusFilter, sortBy, direction, currentPage, pageSize } = get()
@@ -95,18 +109,21 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
   createArticle: async (payload: CreateArticlePayload) => {
     const newArticle = await articleRepo.create(payload)
     await get().fetchArticles()
+    await get().fetchMetrics()
     return newArticle
   },
 
   updateArticle: async (id: string, payload: UpdateArticlePayload) => {
     const updated = await articleRepo.update(id, payload)
     await get().fetchArticles()
+    await get().fetchMetrics()
     return updated
   },
 
   deleteArticle: async (id: string) => {
     await articleRepo.delete(id)
     await get().fetchArticles()
+    await get().fetchMetrics()
   },
 
   togglePublish: async (id: string) => {
@@ -114,6 +131,7 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
     set((state) => ({
       articles: state.articles.map((item) => (item.id === id ? updated : item))
     }))
+    await get().fetchMetrics()
     return updated
   },
 

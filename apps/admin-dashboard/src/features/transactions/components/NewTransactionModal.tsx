@@ -5,6 +5,7 @@ import type { CustomerItem } from '../../customers/models/CustomerModel'
 import { PackageRepository } from '../../packages/repositories/PackageRepository'
 import { CustomerRepository } from '../../customers/repositories/CustomerRepository'
 import { PhoneInput } from '../../../components/ui/PhoneInput'
+import { CurrencyInput } from '../../../components/ui/CurrencyInput'
 import { SearchableSelect, type SearchableOption } from '../../../components/ui/SearchableSelect'
 import { FormField } from '../../../components/ui/FormField'
 import { validators } from '../../../shared/utils/validators'
@@ -57,7 +58,7 @@ export const NewTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSubmit
 
   // Payment / Down Payment State
   const [paymentOption, setPaymentOption] = useState<'UNPAID' | 'DOWN_PAYMENT' | 'PAID'>('UNPAID')
-  const [customDownPayment, setCustomDownPayment] = useState<string>('0')
+  const [customDownPayment, setCustomDownPayment] = useState<number>(0)
 
   // Validation States
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -236,7 +237,7 @@ export const NewTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSubmit
     ? total 
     : paymentOption === 'UNPAID' 
       ? 0 
-      : Math.min(total, Math.max(0, parseFloat(customDownPayment) || 0))
+      : Math.min(total, Math.max(0, customDownPayment))
   const remainingBalance = Math.max(0, total - effectiveDp)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -500,8 +501,13 @@ export const NewTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSubmit
                           <button
                             type="button"
                             onClick={() => {
-                              const step = item.packageType === 'WEIGHT' ? 0.5 : 1
-                              const nextVal = Math.max(0.5, Math.round(((Number(item.quantity) || 1) - step) * 10) / 10)
+                              const isPcs = item.packageType === 'PCS'
+                              const step = isPcs ? 1 : 0.5
+                              const min = isPcs ? 1 : 0.1
+                              const current = Number(item.quantity) || 1
+                              const nextVal = isPcs 
+                                ? Math.max(min, Math.round(current - step))
+                                : Math.max(min, Math.round((current - step) * 10) / 10)
                               handleUpdateItemQuantity(item.id, nextVal)
                             }}
                             className="w-8 h-8 rounded-lg bg-brand-50 text-ink hover:bg-brand-100 grid place-items-center transition shrink-0"
@@ -512,12 +518,24 @@ export const NewTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSubmit
                           <div className="flex-1 flex items-center justify-center gap-1 px-2">
                             <input
                               type="number"
-                              step="0.1"
-                              min="0.1"
+                              step={item.packageType === 'PCS' ? '1' : '0.1'}
+                              min={item.packageType === 'PCS' ? '1' : '0.1'}
                               value={item.quantity === 0 ? '' : item.quantity}
                               onChange={(e) => {
-                                const val = parseFloat(e.target.value)
-                                handleUpdateItemQuantity(item.id, isNaN(val) ? 0 : val)
+                                const isPcs = item.packageType === 'PCS'
+                                if (isPcs) {
+                                  const clean = e.target.value.replace(/\D/g, '')
+                                  const val = clean ? parseInt(clean, 10) : 0
+                                  handleUpdateItemQuantity(item.id, val)
+                                } else {
+                                  const val = parseFloat(e.target.value)
+                                  handleUpdateItemQuantity(item.id, isNaN(val) ? 0 : val)
+                                }
+                              }}
+                              onKeyDown={(e) => {
+                                if (item.packageType === 'PCS' && (e.key === '.' || e.key === ',')) {
+                                  e.preventDefault()
+                                }
                               }}
                               className="w-full text-center font-bold text-sm text-ink bg-transparent focus:outline-none"
                               placeholder="1"
@@ -530,8 +548,12 @@ export const NewTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSubmit
                           <button
                             type="button"
                             onClick={() => {
-                              const step = item.packageType === 'WEIGHT' ? 0.5 : 1
-                              const nextVal = Math.round(((Number(item.quantity) || 1) + step) * 10) / 10
+                              const isPcs = item.packageType === 'PCS'
+                              const step = isPcs ? 1 : 0.5
+                              const current = Number(item.quantity) || 1
+                              const nextVal = isPcs 
+                                ? Math.round(current + step)
+                                : Math.round((current + step) * 10) / 10
                               handleUpdateItemQuantity(item.id, nextVal)
                             }}
                             className="w-8 h-8 rounded-lg bg-brand-600 text-white hover:bg-brand-700 grid place-items-center transition shrink-0"
@@ -586,7 +608,7 @@ export const NewTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSubmit
                   type="button"
                   onClick={() => {
                     setPaymentOption('UNPAID')
-                    setCustomDownPayment('0')
+                    setCustomDownPayment(0)
                   }}
                   className={`py-2 px-2 rounded-xl text-xs font-bold transition flex flex-col items-center gap-1 border ${
                     paymentOption === 'UNPAID'
@@ -602,8 +624,8 @@ export const NewTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSubmit
                   type="button"
                   onClick={() => {
                     setPaymentOption('DOWN_PAYMENT')
-                    if (!parseFloat(customDownPayment) || parseFloat(customDownPayment) >= total) {
-                      setCustomDownPayment(String(Math.round(total * 0.5)))
+                    if (!customDownPayment || customDownPayment >= total) {
+                      setCustomDownPayment(Math.round(total * 0.5))
                     }
                   }}
                   className={`py-2 px-2 rounded-xl text-xs font-bold transition flex flex-col items-center gap-1 border ${
@@ -620,7 +642,7 @@ export const NewTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSubmit
                   type="button"
                   onClick={() => {
                     setPaymentOption('PAID')
-                    setCustomDownPayment(String(total))
+                    setCustomDownPayment(total)
                   }}
                   className={`py-2 px-2 rounded-xl text-xs font-bold transition flex flex-col items-center gap-1 border ${
                     paymentOption === 'PAID'
@@ -643,7 +665,7 @@ export const NewTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSubmit
                         <button
                           key={pct}
                           type="button"
-                          onClick={() => setCustomDownPayment(String(Math.round(total * pct)))}
+                          onClick={() => setCustomDownPayment(Math.round(total * pct))}
                           className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-brand-100 hover:bg-brand-200 text-brand-700 transition"
                         >
                           {pct * 100}%
@@ -652,17 +674,10 @@ export const NewTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSubmit
                     </div>
                   </div>
 
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-ink-soft">
-                      Rp
-                    </span>
-                    <input
-                      type="number"
-                      min={0}
-                      max={total}
+                  <div>
+                    <CurrencyInput
                       value={customDownPayment}
-                      onChange={(e) => setCustomDownPayment(e.target.value)}
-                      className="w-full pl-9 pr-3.5 py-2 rounded-xl bg-brand-50/40 border border-brand-200 text-xs font-bold text-ink focus:outline-none focus:border-brand-600 transition"
+                      onChange={(val) => setCustomDownPayment(Math.min(total, Math.max(0, val)))}
                       placeholder="0"
                     />
                   </div>

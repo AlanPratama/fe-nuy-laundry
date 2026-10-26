@@ -65,6 +65,7 @@ export const CustomersPage: React.FC = () => {
     setPhoneQuery,
     setAddressQuery,
     setSort,
+    initFilters,
     resetFilters
   } = useCustomerStore()
 
@@ -101,14 +102,16 @@ export const CustomersPage: React.FC = () => {
 
   const canManage = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN'
 
-  // Initialize store from URL on first mount
+  // Initialize store from URL on first mount in a single batch
   useEffect(() => {
-    if (urlQ !== searchQuery) setSearchQuery(urlQ)
-    if (urlPhone !== phoneQuery) setPhoneQuery(urlPhone)
-    if (urlAddress !== addressQuery) setAddressQuery(urlAddress)
-    if (urlSortField !== sortBy || urlSortDir !== direction) setSort(urlSortField, urlSortDir)
-    if (urlPage !== currentPage) setPage(urlPage)
-    if (urlSize !== pageSize) setPageSize(urlSize)
+    initFilters({
+      ...(urlQ && { searchQuery: urlQ }),
+      ...(urlPhone && { phoneQuery: urlPhone }),
+      ...(urlAddress && { addressQuery: urlAddress }),
+      ...(urlSortField && urlSortDir && { sortBy: urlSortField, direction: urlSortDir }),
+      ...(!isNaN(urlPage) && urlPage >= 1 && { currentPage: urlPage }),
+      ...(!isNaN(urlSize) && urlSize > 0 && { pageSize: urlSize })
+    })
   }, [])
 
   // Helper to update URL params
@@ -550,20 +553,19 @@ export const CustomersPage: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => handleOpenHistory(cust)}
-                            className="px-2.5 py-1.5 rounded-full bg-brand-50 text-brand-600 text-xs font-bold hover:bg-brand-100 transition inline-flex items-center gap-1 shadow-xs"
-                            title="Riwayat transaksi"
+                            className="w-8 h-8 rounded-full bg-brand-50 text-brand-600 hover:bg-brand-600 hover:text-white grid place-items-center transition shrink-0"
+                            title="Riwayat Transaksi"
                           >
-                            <History className="w-3.5 h-3.5" />
-                            <span>Riwayat</span>
+                            <History className="w-4 h-4" />
                           </button>
 
                           <button
                             type="button"
                             onClick={(e) => handleOpenWhatsApp(e, cust)}
-                            className="w-7 h-7 rounded-full bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white grid place-items-center transition shrink-0"
+                            className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white grid place-items-center transition shrink-0"
                             title="Chat WhatsApp"
                           >
-                            <Send className="w-3 h-3" />
+                            <Send className="w-4 h-4" />
                           </button>
 
                           <button
@@ -572,20 +574,20 @@ export const CustomersPage: React.FC = () => {
                               setEditingCustomer(cust)
                               setIsFormModalOpen(true)
                             }}
-                            className="w-7 h-7 rounded-full bg-amber-50 text-amber-700 hover:bg-amber-600 hover:text-white grid place-items-center transition shrink-0"
-                            title="Edit pelanggan"
+                            className="w-8 h-8 rounded-full bg-amber-50 text-amber-700 hover:bg-amber-600 hover:text-white grid place-items-center transition shrink-0"
+                            title="Edit Pelanggan"
                           >
-                            <Edit3 className="w-3 h-3" />
+                            <Edit3 className="w-4 h-4" />
                           </button>
 
                           {canManage && (
                             <button
                               type="button"
                               onClick={() => setCustomerToDelete(cust)}
-                              className="w-7 h-7 rounded-full bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white grid place-items-center transition shrink-0"
-                              title="Hapus pelanggan"
+                              className="w-8 h-8 rounded-full bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white grid place-items-center transition shrink-0"
+                              title="Hapus Pelanggan"
                             >
-                              <Trash2 className="w-3 h-3" />
+                              <Trash2 className="w-4 h-4" />
                             </button>
                           )}
                         </div>

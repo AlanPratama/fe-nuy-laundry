@@ -39,6 +39,7 @@ export interface TransactionQueryParams {
   direction?: 'asc' | 'desc'
   period?: 'ALL' | 'TODAY' | 'WEEK' | 'MONTH'
   picId?: string
+  userId?: string
   customerId?: string
   packageId?: string
 }

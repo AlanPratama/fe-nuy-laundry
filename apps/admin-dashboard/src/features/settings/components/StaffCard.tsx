@@ -1,7 +1,7 @@
 import React from 'react'
 import type { StaffUser } from '../models/SettingsModel'
 import { resolveImageUrl } from '../../../shared/utils/imageUrl'
-import { Shield, Phone, MapPin, Calendar, Edit2, Trash2, CheckCircle2, XCircle } from 'lucide-react'
+import { Shield, Phone, MapPin, Calendar, Edit2, Trash2, CheckCircle2, XCircle, Eye } from 'lucide-react'
 
 interface StaffCardProps {
   staff: StaffUser
@@ -12,6 +12,7 @@ interface StaffCardProps {
   onEdit: (staff: StaffUser) => void
   onDelete: (staff: StaffUser) => void
   onToggleStatus?: (staff: StaffUser) => void
+  onViewDetail?: (staff: StaffUser) => void
 }
 
 export const StaffCard: React.FC<StaffCardProps> = ({
@@ -22,7 +23,8 @@ export const StaffCard: React.FC<StaffCardProps> = ({
   canDelete = true,
   onEdit,
   onDelete,
-  onToggleStatus
+  onToggleStatus,
+  onViewDetail
 }) => {
   const getRoleBadge = (role: string) => {
     switch (role) {
@@ -149,31 +151,44 @@ export const StaffCard: React.FC<StaffCardProps> = ({
           </span>
         )}
 
-        {canManage && (canEdit || canDelete) && (
-          <div className="flex items-center gap-1.5">
-            {canEdit && (
-              <button
-                type="button"
-                onClick={() => onEdit(staff)}
-                className="w-8 h-8 rounded-xl bg-brand-50 text-brand-600 hover:bg-brand-600 hover:text-white grid place-items-center transition shadow-xs"
-                title="Edit Staff"
-              >
-                <Edit2 className="w-3.5 h-3.5" />
-              </button>
-            )}
+        <div className="flex items-center gap-1.5">
+          {onViewDetail && (
+            <button
+              type="button"
+              onClick={() => onViewDetail(staff)}
+              className="w-8 h-8 rounded-full bg-brand-50 text-brand-600 hover:bg-brand-600 hover:text-white grid place-items-center transition shadow-xs"
+              title="Lihat Detail Staff"
+            >
+              <Eye className="w-3.5 h-3.5" />
+            </button>
+          )}
 
-            {canDelete && !isSelf && (
-              <button
-                type="button"
-                onClick={() => onDelete(staff)}
-                className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white grid place-items-center transition shadow-xs"
-                title="Hapus Akun Staff"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-        )}
+          {canManage && (canEdit || canDelete) && (
+            <>
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={() => onEdit(staff)}
+                  className="w-8 h-8 rounded-full bg-amber-50 text-amber-700 hover:bg-amber-600 hover:text-white grid place-items-center transition shadow-xs"
+                  title="Edit Staff"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                </button>
+              )}
+
+              {canDelete && !isSelf && (
+                <button
+                  type="button"
+                  onClick={() => onDelete(staff)}
+                  className="w-8 h-8 rounded-full bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white grid place-items-center transition shadow-xs"
+                  title="Hapus Akun Staff"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   )

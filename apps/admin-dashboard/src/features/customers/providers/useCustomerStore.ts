@@ -30,6 +30,15 @@ interface CustomerStore {
   setAddressQuery: (address: string) => void
   setSort: (sortBy: 'lastOrderDate' | 'totalOrders' | 'totalSpent' | 'name', direction: 'asc' | 'desc') => void
   setSelectedCustomer: (customer: CustomerItem | null) => void
+  initFilters: (filters: {
+    searchQuery?: string
+    phoneQuery?: string
+    addressQuery?: string
+    sortBy?: 'lastOrderDate' | 'totalOrders' | 'totalSpent' | 'name'
+    direction?: 'asc' | 'desc'
+    currentPage?: number
+    pageSize?: number
+  }) => void
   resetFilters: () => void
 }
 
@@ -132,6 +141,17 @@ export const useCustomerStore = create<CustomerStore>((set, get) => ({
   setAddressQuery: (addressQuery) => set({ addressQuery, currentPage: 1 }),
   setSort: (sortBy, direction) => set({ sortBy, direction, currentPage: 1 }),
   setSelectedCustomer: (selectedCustomer) => set({ selectedCustomer }),
+  initFilters: (filters) => {
+    set({
+      ...(filters.searchQuery !== undefined && { searchQuery: filters.searchQuery }),
+      ...(filters.phoneQuery !== undefined && { phoneQuery: filters.phoneQuery }),
+      ...(filters.addressQuery !== undefined && { addressQuery: filters.addressQuery }),
+      ...(filters.sortBy !== undefined && { sortBy: filters.sortBy }),
+      ...(filters.direction !== undefined && { direction: filters.direction }),
+      ...(filters.currentPage !== undefined && { currentPage: filters.currentPage }),
+      ...(filters.pageSize !== undefined && { pageSize: filters.pageSize })
+    })
+  },
   resetFilters: () => set({
     searchQuery: '',
     phoneQuery: '',

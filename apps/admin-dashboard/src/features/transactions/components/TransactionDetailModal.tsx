@@ -6,8 +6,10 @@ import { ReceiptPrintModal } from './ReceiptPrintModal'
 import { ConfirmationModal } from '../../../components/ui/ConfirmationModal'
 import { CustomSelect } from '../../../components/ui/CustomSelect'
 import { CopyButton } from '../../../components/ui/CopyButton'
+import { CurrencyInput } from '../../../components/ui/CurrencyInput'
 import { useToast } from '../../../components/ui/Toast'
 import { useAuthStore } from '../../auth/providers/useAuthStore'
+import { useTransactionStore } from '../providers/useTransactionStore'
 import { 
   X, 
   Printer, 
@@ -20,7 +22,8 @@ import {
   User,
   Trash2,
   CreditCard,
-  Edit2
+  Edit2,
+  PackageCheck
 } from 'lucide-react'
 
 interface Props {
@@ -33,31 +36,48 @@ interface Props {
     id: string,
     beforeUrls: string[],
     afterUrls: string[],
-    newFiles?: { conditionBeforeFiles?: File[]; conditionAfterFiles?: File[] }
+    newFiles?: { conditionBeforeFiles?: File[]; conditionAfterFiles?: File[] },
+    deletedFileIds?: string[]
   ) => Promise<void>
   onDelete?: (id: string) => Promise<void>
+}
+
+interface PhotoItem {
+  id?: string
+  url: string
+}
+
+interface NewPhotoItem {
+  file: File
+  url: string
 }
 
 export const TransactionDetailModal: React.FC<Props> = ({
   isOpen,
   onClose,
-  transaction,
+  transaction: initialTransaction,
   onUpdateStatus,
   onUpdatePayment,
   onSavePhotos,
   onDelete
 }) => {
-  if (!isOpen || !transaction) return null
+  if (!isOpen || !initialTransaction) return null
 
-  const { user } = useAuthStore()
+  const { user, token } = useAuthStore()
+  const { markDetailDelivered, deleteTransactionFiles, getTransactionById } = useTransactionStore()
   const canManage = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN'
 
   const { success, error: toastError } = useToast()
-  const [status, setStatus] = useState<TransactionStatus>(transaction.status)
-  const [beforeUrls, setBeforeUrls] = useState<string[]>(transaction.conditionBeforeUrls || [])
-  const [afterUrls, setAfterUrls] = useState<string[]>(transaction.conditionAfterUrls || [])
-  const [newBeforeFiles, setNewBeforeFiles] = useState<File[]>([])
-  const [newAfterFiles, setNewAfterFiles] = useState<File[]>([])
+  const [transaction, setLocalTransaction] = useState<TransactionResponseDTO>(initialTransaction)
+  const [status, setStatus] = useState<TransactionStatus>(initialTransaction.status)
+
+  // Staged Photos state (separate existing MinIO photos from newly staged File instances)
+  const [existingBefore, setExistingBefore] = useState<PhotoItem[]>([])
+  const [newBefore, setNewBefore] = useState<NewPhotoItem[]>([])
+  const [existingAfter, setExistingAfter] = useState<PhotoItem[]>([])
+  const [newAfter, setNewAfter] = useState<NewPhotoItem[]>([])
+  const [deletedFileIds, setDeletedFileIds] = useState<string[]>([])
+
   const [isPrintOpen, setIsPrintOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
@@ -65,20 +85,39 @@ export const TransactionDetailModal: React.FC<Props> = ({
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
+  // Partial pickup loading states
+  const [deliveringItemId, setDeliveringItemId] = useState<string | null>(null)
+  const [isDeliveringAll, setIsDeliveringAll] = useState(false)
+
   // Payment states
   const [isUpdatingPayment, setIsUpdatingPayment] = useState(false)
   const [showEditPayment, setShowEditPayment] = useState(false)
-  const [editDpAmount, setEditDpAmount] = useState<number>(transaction.downPayment || 0)
+  const [editDpAmount, setEditDpAmount] = useState<number>(initialTransaction.downPayment || 0)
 
   useEffect(() => {
-    if (transaction) {
-      setStatus(transaction.status)
-      setBeforeUrls(transaction.conditionBeforeUrls || [])
-      setAfterUrls(transaction.conditionAfterUrls || [])
-      setEditDpAmount(transaction.downPayment || 0)
+    if (initialTransaction) {
+      setLocalTransaction(initialTransaction)
+      setStatus(initialTransaction.status)
+      setEditDpAmount(initialTransaction.downPayment || 0)
       setShowEditPayment(false)
+
+      // Initialize existing photos
+      const beforeList: PhotoItem[] = (initialTransaction.conditionBeforeUrls || []).map((url) => {
+        const match = initialTransaction.transactionFiles?.find((f) => f.filePath === url || f.fileUrl === url)
+        return { id: match?.id, url }
+      })
+      const afterList: PhotoItem[] = (initialTransaction.conditionAfterUrls || []).map((url) => {
+        const match = initialTransaction.transactionFiles?.find((f) => f.filePath === url || f.fileUrl === url)
+        return { id: match?.id, url }
+      })
+
+      setExistingBefore(beforeList)
+      setExistingAfter(afterList)
+      setNewBefore([])
+      setNewAfter([])
+      setDeletedFileIds([])
     }
-  }, [transaction])
+  }, [initialTransaction])
 
   const handleStatusChange = async (newStatus: TransactionStatus) => {
     if (newStatus === 'CANCELED') {
@@ -89,6 +128,7 @@ export const TransactionDetailModal: React.FC<Props> = ({
     try {
       if (onUpdateStatus) {
         await onUpdateStatus(transaction.id, newStatus)
+        setLocalTransaction((prev) => ({ ...prev, status: newStatus }))
         success(`Status transaksi berhasil diperbarui menjadi ${newStatus}`)
       }
     } catch (err: any) {
@@ -101,6 +141,7 @@ export const TransactionDetailModal: React.FC<Props> = ({
     try {
       if (onUpdateStatus) {
         await onUpdateStatus(transaction.id, 'CANCELED')
+        setLocalTransaction((prev) => ({ ...prev, status: 'CANCELED' }))
         success('Transaksi berhasil dibatalkan')
       }
     } catch (err: any) {
@@ -114,6 +155,12 @@ export const TransactionDetailModal: React.FC<Props> = ({
     setIsUpdatingPayment(true)
     try {
       await onUpdatePayment(transaction.id, transaction.totalAmount, 'PAID')
+      setLocalTransaction((prev) => ({
+        ...prev,
+        downPayment: transaction.totalAmount,
+        remainingBalance: 0,
+        paymentStatus: 'PAID'
+      }))
       success('Pembayaran transaksi berhasil dilunasi!')
     } catch (err: any) {
       toastError(err?.message || 'Gagal memperbarui status pembayaran')
@@ -129,6 +176,12 @@ export const TransactionDetailModal: React.FC<Props> = ({
       const dp = Math.max(0, editDpAmount)
       const newStatus = dp >= transaction.totalAmount ? 'PAID' : dp > 0 ? 'DOWN_PAYMENT' : 'UNPAID'
       await onUpdatePayment(transaction.id, dp, newStatus)
+      setLocalTransaction((prev) => ({
+        ...prev,
+        downPayment: dp,
+        remainingBalance: Math.max(0, transaction.totalAmount - dp),
+        paymentStatus: newStatus
+      }))
       success('Data pembayaran / DP berhasil diperbarui!')
       setShowEditPayment(false)
     } catch (err: any) {
@@ -138,26 +191,144 @@ export const TransactionDetailModal: React.FC<Props> = ({
     }
   }
 
+  // Handle Partial Pickup for single item
+  const handleMarkItemDelivered = async (itemId: string) => {
+    setDeliveringItemId(itemId)
+    try {
+      await markDetailDelivered(token || undefined, itemId)
+      success('Item cucian berhasil ditandai telah diambil!')
+      const updated = await getTransactionById(token || undefined, transaction.id)
+      if (updated) {
+        setLocalTransaction(updated)
+        setStatus(updated.status)
+      }
+    } catch (err: any) {
+      toastError(err?.message || 'Gagal menandai item diambil')
+    } finally {
+      setDeliveringItemId(null)
+    }
+  }
+
+  // Handle Pickup for all remaining undelivered items
+  const handleDeliverAllItems = async () => {
+    const undelivered = transaction.items?.filter((it) => !it.deliveredDate) || []
+    if (undelivered.length === 0) return
+
+    setIsDeliveringAll(true)
+    try {
+      for (const it of undelivered) {
+        await markDetailDelivered(token || undefined, it.id)
+      }
+      success('Seluruh item cucian berhasil ditandai telah diambil & transaksi selesai!')
+      const updated = await getTransactionById(token || undefined, transaction.id)
+      if (updated) {
+        setLocalTransaction(updated)
+        setStatus(updated.status)
+      }
+    } catch (err: any) {
+      toastError(err?.message || 'Gagal memproses pengambilan seluruh item')
+    } finally {
+      setIsDeliveringAll(false)
+    }
+  }
+
+  // Handle Photo Staging & Removal without leaving stale File objects
+  const handleAddBeforeFiles = (files: File[]) => {
+    files.forEach((file) => {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        if (e.target?.result) {
+          setNewBefore((prev) => [...prev, { file, url: e.target!.result as string }])
+        }
+      }
+      reader.readAsDataURL(file)
+    })
+  }
+
+  const handleRemoveBeforeImage = (idx: number) => {
+    if (idx < existingBefore.length) {
+      const target = existingBefore[idx]
+      if (target.id) {
+        setDeletedFileIds((prev) => [...prev, target.id!])
+      }
+      setExistingBefore((prev) => prev.filter((_, i) => i !== idx))
+    } else {
+      const newIdx = idx - existingBefore.length
+      setNewBefore((prev) => prev.filter((_, i) => i !== newIdx))
+    }
+  }
+
+  const handleAddAfterFiles = (files: File[]) => {
+    files.forEach((file) => {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        if (e.target?.result) {
+          setNewAfter((prev) => [...prev, { file, url: e.target!.result as string }])
+        }
+      }
+      reader.readAsDataURL(file)
+    })
+  }
+
+  const handleRemoveAfterImage = (idx: number) => {
+    if (idx < existingAfter.length) {
+      const target = existingAfter[idx]
+      if (target.id) {
+        setDeletedFileIds((prev) => [...prev, target.id!])
+      }
+      setExistingAfter((prev) => prev.filter((_, i) => i !== idx))
+    } else {
+      const newIdx = idx - existingAfter.length
+      setNewAfter((prev) => prev.filter((_, i) => i !== newIdx))
+    }
+  }
+
   const handleSaveAll = async () => {
     setIsSaving(true)
     try {
-      if (onSavePhotos) {
-        await onSavePhotos(transaction.id, beforeUrls, afterUrls, {
-          conditionBeforeFiles: newBeforeFiles,
-          conditionAfterFiles: newAfterFiles
-        })
+      const finalBeforeUrls = existingBefore.map((e) => e.url)
+      const finalAfterUrls = existingAfter.map((e) => e.url)
+      const newFiles = {
+        conditionBeforeFiles: newBefore.map((n) => n.file),
+        conditionAfterFiles: newAfter.map((n) => n.file)
       }
+
+      if (onSavePhotos) {
+        await onSavePhotos(
+          transaction.id,
+          finalBeforeUrls,
+          finalAfterUrls,
+          newFiles,
+          deletedFileIds
+        )
+      } else {
+        if (deletedFileIds.length > 0) {
+          await deleteTransactionFiles(token || undefined, deletedFileIds)
+        }
+      }
+
       success('Perubahan foto dokumentasi transaksi berhasil disimpan!')
-      setNewBeforeFiles([])
-      setNewAfterFiles([])
+      setNewBefore([])
+      setNewAfter([])
+      setDeletedFileIds([])
       setSaveSuccess(true)
       setTimeout(() => setSaveSuccess(false), 2000)
+
+      // Refresh latest transaction state
+      const updated = await getTransactionById(token || undefined, transaction.id)
+      if (updated) {
+        setLocalTransaction(updated)
+      }
     } catch (err: any) {
       toastError(err?.message || 'Gagal menyimpan foto dokumentasi')
     } finally {
       setIsSaving(false)
     }
   }
+
+  const beforeDisplayUrls = [...existingBefore.map((e) => e.url), ...newBefore.map((n) => n.url)]
+  const afterDisplayUrls = [...existingAfter.map((e) => e.url), ...newAfter.map((n) => n.url)]
+  const hasUndeliveredItems = transaction.items?.some((it) => !it.deliveredDate)
 
   const handleSendWhatsApp = () => {
     const phone = (transaction.customerPhone || '').replace(/\D/g, '')
@@ -316,20 +487,62 @@ export const TransactionDetailModal: React.FC<Props> = ({
 
               {/* Items Breakdown */}
               <div>
-                <h3 className="text-xs font-bold text-ink uppercase tracking-wider mb-3">Rincian Paket & Tagihan</h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-xs font-bold text-ink uppercase tracking-wider">Rincian Paket & Tagihan</h3>
+                  {hasUndeliveredItems && status !== 'CANCELED' && (
+                    <button
+                      type="button"
+                      disabled={isDeliveringAll}
+                      onClick={handleDeliverAllItems}
+                      className="px-3 py-1 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+                      title="Ambil seluruh barang yang tersisa dan selesaikan pesanan"
+                    >
+                      <PackageCheck className="w-3.5 h-3.5" />
+                      <span>{isDeliveringAll ? 'Memproses...' : 'Ambil Semua Barang (Selesai)'}</span>
+                    </button>
+                  )}
+                </div>
+
                 <div className="space-y-2">
                   {transaction.items && transaction.items.length > 0 ? (
                     transaction.items.map((item, idx) => (
-                      <div key={idx} className="flex items-center justify-between p-3.5 rounded-2xl bg-brand-50/40 border border-brand-50 text-sm">
-                        <div>
-                          <p className="font-semibold text-ink">{item.packageName}</p>
-                          <p className="text-xs text-ink-soft">
+                      <div key={item.id || idx} className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-2xl bg-brand-50/40 border border-brand-50 text-sm gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-semibold text-ink">{item.packageName}</p>
+                            {item.deliveredDate ? (
+                              <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold flex items-center gap-1 shrink-0">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                Diambil: {new Date(item.deliveredDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold shrink-0">
+                                Belum Diambil
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-ink-soft mt-0.5">
                             {item.quantity} {item.packageType === 'WEIGHT' ? 'Kg' : 'Pcs'} × Rp{item.pricePerUnit.toLocaleString('id-ID')}
                           </p>
                         </div>
-                        <p className="font-bold text-ink">
-                          Rp{item.subtotal.toLocaleString('id-ID')}
-                        </p>
+
+                        <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+                          <p className="font-bold text-ink">
+                            Rp{item.subtotal.toLocaleString('id-ID')}
+                          </p>
+
+                          {!item.deliveredDate && status !== 'CANCELED' && (
+                            <button
+                              type="button"
+                              disabled={deliveringItemId === item.id}
+                              onClick={() => handleMarkItemDelivered(item.id)}
+                              className="px-2.5 py-1 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold transition shadow-xs disabled:opacity-50"
+                              title="Tandai item ini sudah diambil pelanggan"
+                            >
+                              {deliveringItemId === item.id ? '...' : 'Ambil Item'}
+                            </button>
+                          )}
+                        </div>
                       </div>
                     ))
                   ) : (
@@ -403,35 +616,32 @@ export const TransactionDetailModal: React.FC<Props> = ({
                     </div>
                   </div>
 
-                  {/* Inline Edit DP or Quick Pelunasan */}
+                  {/* Inline Edit DP with CurrencyInput */}
                   {showEditPayment ? (
                     <div className="pt-2 border-t border-brand-100 space-y-2 animate-in fade-in duration-150">
                       <label className="text-[11px] font-bold text-ink-soft uppercase tracking-wider block">
                         Ubah Nominal Pembayaran / DP (Rp):
                       </label>
                       <div className="flex items-center gap-2">
-                        <input
-                          type="number"
-                          min="0"
-                          max={transaction.totalAmount}
-                          step="1000"
-                          value={editDpAmount}
-                          onChange={(e) => setEditDpAmount(Math.max(0, Number(e.target.value) || 0))}
-                          className="flex-1 px-3 py-1.5 rounded-xl border border-brand-200 text-sm font-bold text-ink focus:outline-hidden focus:ring-2 focus:ring-brand-500"
-                          placeholder="Nominal DP"
-                        />
+                        <div className="flex-1">
+                          <CurrencyInput
+                            value={editDpAmount}
+                            onChange={(val) => setEditDpAmount(Math.min(transaction.totalAmount, Math.max(0, val)))}
+                            placeholder="0"
+                          />
+                        </div>
                         <button
                           type="button"
                           disabled={isUpdatingPayment}
                           onClick={handleSaveCustomPayment}
-                          className="px-4 py-1.5 rounded-xl bg-brand-600 text-white text-xs font-bold hover:bg-brand-700 transition disabled:opacity-50"
+                          className="px-4 py-3 rounded-2xl bg-brand-600 text-white text-xs font-bold hover:bg-brand-700 transition disabled:opacity-50"
                         >
-                          {isUpdatingPayment ? 'Menyimpan...' : 'Simpan'}
+                          {isUpdatingPayment ? '...' : 'Simpan'}
                         </button>
                         <button
                           type="button"
                           onClick={() => setShowEditPayment(false)}
-                          className="px-3 py-1.5 rounded-xl border border-brand-200 text-ink-soft text-xs font-bold hover:bg-brand-100 transition"
+                          className="px-3 py-3 rounded-2xl border border-brand-200 text-ink-soft text-xs font-bold hover:bg-brand-100 transition"
                         >
                           Batal
                         </button>
@@ -440,21 +650,21 @@ export const TransactionDetailModal: React.FC<Props> = ({
                         <button
                           type="button"
                           onClick={() => setEditDpAmount(0)}
-                          className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-white border border-brand-200 text-ink-soft hover:bg-brand-50"
+                          className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-white border border-brand-200 text-ink-soft hover:bg-brand-50"
                         >
                           Rp0 (Belum Bayar)
                         </button>
                         <button
                           type="button"
                           onClick={() => setEditDpAmount(Math.round(transaction.totalAmount / 2))}
-                          className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-white border border-brand-200 text-ink-soft hover:bg-brand-50"
+                          className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-white border border-brand-200 text-ink-soft hover:bg-brand-50"
                         >
                           DP 50%
                         </button>
                         <button
                           type="button"
                           onClick={() => setEditDpAmount(transaction.totalAmount)}
-                          className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-white border border-brand-200 text-emerald-700 hover:bg-emerald-50"
+                          className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-white border border-brand-200 text-emerald-700 hover:bg-emerald-50"
                         >
                           Lunas 100%
                         </button>
@@ -488,19 +698,17 @@ export const TransactionDetailModal: React.FC<Props> = ({
                 <ImageUploader
                   label="Foto Kondisi Sebelum Dicuci"
                   sublabel="Foto pakaian kotor atau bukti cacat/noda awal dari pelanggan"
-                  images={beforeUrls}
-                  onAddImage={(url) => setBeforeUrls((prev) => [...prev, url])}
-                  onAddFiles={(files) => setNewBeforeFiles((prev) => [...prev, ...files])}
-                  onRemoveImage={(idx) => setBeforeUrls((prev) => prev.filter((_, i) => i !== idx))}
+                  images={beforeDisplayUrls}
+                  onAddFiles={handleAddBeforeFiles}
+                  onRemoveImage={handleRemoveBeforeImage}
                 />
 
                 <ImageUploader
                   label="Foto Kondisi Setelah Selesai"
                   sublabel="Foto pakaian rapi, terlipat wangi, atau saat siap diantar"
-                  images={afterUrls}
-                  onAddImage={(url) => setAfterUrls((prev) => [...prev, url])}
-                  onAddFiles={(files) => setNewAfterFiles((prev) => [...prev, ...files])}
-                  onRemoveImage={(idx) => setAfterUrls((prev) => prev.filter((_, i) => i !== idx))}
+                  images={afterDisplayUrls}
+                  onAddFiles={handleAddAfterFiles}
+                  onRemoveImage={handleRemoveAfterImage}
                 />
               </div>
             </div>

@@ -4,7 +4,8 @@ import type {
   ArticleItem, 
   CreateArticlePayload, 
   UpdateArticlePayload, 
-  ArticleQueryParams 
+  ArticleQueryParams,
+  ArticleMetrics
 } from '../models/ArticleModel'
 
 export interface ArticlePageResult {
@@ -21,6 +22,7 @@ export interface IArticleRepository {
   delete(id: string): Promise<void>
   togglePublish(id: string): Promise<ArticleItem>
   uploadContentImage(file: File): Promise<string>
+  getMetrics(): Promise<ArticleMetrics>
 }
 
 export class ArticleRepository implements IArticleRepository {
@@ -157,5 +159,21 @@ export class ArticleRepository implements IArticleRepository {
       return res.data.data.url
     }
     throw new Error('Gagal mengunggah gambar konten artikel')
+  }
+
+  async getMetrics(): Promise<ArticleMetrics> {
+    try {
+      const res = await apiClient.get<ApiResponse<{ totalArticles: number; publishedArticles: number; draftArticles: number }>>('/api/v1/articles/metrics')
+      if (res.data?.data) {
+        return {
+          total: res.data.data.totalArticles ?? 0,
+          published: res.data.data.publishedArticles ?? 0,
+          draft: res.data.data.draftArticles ?? 0
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch article metrics:', err)
+    }
+    return { total: 0, published: 0, draft: 0 }
   }
 }

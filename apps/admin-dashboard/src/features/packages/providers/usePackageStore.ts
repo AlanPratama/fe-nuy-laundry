@@ -21,6 +21,7 @@ interface PackageStore {
   setStatusFilter: (status: 'ALL' | 'ACTIVE' | 'INACTIVE') => void
   setSearchQuery: (query: string) => void
   setSort: (sortBy: 'createdAt' | 'price' | 'estimateHours', direction: 'asc' | 'desc') => void
+  initFilters: (filters: Partial<Pick<PackageStore, 'searchQuery' | 'activeFilter' | 'statusFilter' | 'sortBy' | 'direction'>>) => void
   resetFilters: () => void
 }
 
@@ -101,6 +102,7 @@ export const usePackageStore = create<PackageStore>((set, get) => ({
   setStatusFilter: (statusFilter) => set({ statusFilter }),
   setSearchQuery: (searchQuery) => set({ searchQuery }),
   setSort: (sortBy, direction) => set({ sortBy, direction }),
+  initFilters: (filters) => set((state) => ({ ...state, ...filters })),
   resetFilters: () => set({
     activeFilter: 'ALL',
     statusFilter: 'ALL',

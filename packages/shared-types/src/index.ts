@@ -71,6 +71,8 @@ export interface TransactionItem {
   quantity: number; // e.g. 5.5 kg or 2 pcs
   subtotal: number;
   notes?: string;
+  targetDate?: string;
+  deliveredDate?: string | null;
 }
 
 /**
@@ -98,6 +100,12 @@ export interface TransactionResponseDTO {
   conditionBeforeUrls: string[];
   conditionAfterUrls: string[];
   otherUrls: string[];
+  transactionFiles?: Array<{
+    id: string;
+    filePath?: string;
+    fileUrl?: string;
+    fileType?: string;
+  }>;
   createdAt: string;
   updatedAt?: string;
 }
